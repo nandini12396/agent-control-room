@@ -1,0 +1,8 @@
+services:
+  control-room:
+    build: .
+    ports:
+      - "4318:4318"
+    environment:
+      PORT: 4318
+      HOST: 0.0.0.0

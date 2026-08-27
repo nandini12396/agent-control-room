@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#080a0f" />
+  <title>Agent Control Room</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#"><span class="brand-mark"><i></i><i></i><i></i></span><span><strong>AGENT</strong> CONTROL ROOM</span></a>
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-view="live">Live run</button>
+        <button class="nav-tab" data-view="replay">Counterfactual replay</button>
+        <button class="nav-tab" data-view="architecture">How it works</button>
+      </nav>
+      <div class="connection"><span></span> LOCAL TELEMETRY</div>
+    </header>
+
+    <main id="live-view" class="view active">
+      <aside class="control-panel">
+        <div class="panel-heading"><p class="eyebrow">EXPERIMENT CONTROL</p><h1>Run a trajectory</h1><p>Hold the agent constant. Change its runtime policy.</p></div>
+        <label class="field"><span>Failure trajectory</span><select id="scenario"></select></label>
+        <p id="scenario-description" class="field-hint"></p>
+        <div class="field-row">
+          <label class="field"><span>Supervisor</span><select id="supervisor-mode"><option value="hybrid">Hybrid</option><option value="heuristic">Heuristics</option><option value="judge">Trajectory judge</option></select></label>
+          <label class="field"><span>Context policy</span><select id="context-policy"><option value="dynamic">Dynamic</option><option value="ranked">Ranked</option><option value="append">Append-only</option></select></label>
+        </div>
+        <label class="field budget-field"><span>Context budget <output id="budget-value">8K</output></span><input id="budget" type="range" min="4000" max="32000" value="8000" step="4000" /><div class="range-labels"><span>4K</span><span>16K</span><span>32K</span></div></label>
+        <div class="segmented" id="granularity"><button class="active" data-value="symbol">Symbol slices</button><button data-value="file">Whole files</button></div>
+        <label class="switch-row"><span><b>Enforce circuit breaker</b><small>Stop when recovery is unlikely</small></span><input id="enforcement" type="checkbox" checked /><i></i></label>
+        <button id="start-run" class="primary-button"><span>▶</span> Launch agent run</button>
+        <button id="inject-failure" class="danger-button" disabled><span>⚡</span> Force bad trajectory</button>
+        <div class="demo-cue"><span>DEMO CUE</span>Launch “Healthy recovery,” then force a bad trajectory after the test baseline.</div>
+      </aside>
+
+      <section class="workspace">
+        <div class="run-header">
+          <div><div class="run-label"><span id="run-status-dot"></span><span id="run-label">NO ACTIVE RUN</span></div><h2 id="run-title">Ready for telemetry</h2></div>
+          <div class="run-actions"><button id="pause-run" class="icon-button" disabled>Ⅱ</button><span id="run-id">RUN —</span></div>
+        </div>
+        <div class="metrics-grid">
+          <article class="score-card metric-card"><div class="metric-title">RECOVERY LIKELIHOOD <span class="info">i</span></div><div class="score-layout"><div class="score-ring" id="score-ring"><div><strong id="score">100</strong><span>/ 100</span></div></div><div><span id="decision" class="decision continue">CONTINUE</span><p id="decision-copy">Waiting for the first event.</p></div></div></article>
+          <article class="metric-card"><div class="metric-title">TRAJECTORY COST</div><strong class="metric-value" id="token-count">0</strong><span class="metric-unit">tokens</span><div class="mini-stats"><span><b id="call-count">0</b> tool calls</span><span><b id="time-count">0s</b> runtime</span></div></article>
+          <article class="metric-card"><div class="metric-title">USEFUL CONTEXT DENSITY</div><strong class="metric-value" id="density">—</strong><span class="metric-unit">relevant / loaded</span><div class="density-track"><i id="density-bar"></i></div><p id="context-usage">0 / 8,000 tokens allocated</p></article>
+        </div>
+        <div class="workspace-grid">
+          <section class="trajectory-panel card">
+            <div class="card-header"><div><p class="eyebrow">FLIGHT RECORDER</p><h3>Live execution trajectory</h3></div><div class="legend"><span class="good">● progress</span><span class="warn">● concern</span><span class="bad">● stagnation</span></div></div>
+            <div id="timeline-empty" class="empty-state"><div class="empty-radar"><i></i><i></i><span></span></div><h3>No spans received</h3><p>Launch a run to stream model turns, reads, edits, searches, and tests.</p></div>
+            <div id="timeline" class="timeline hidden"></div>
+          </section>
+          <aside class="context-panel card">
+            <div class="card-header"><div><p class="eyebrow">CONTEXT BUDGET</p><h3>Working memory</h3></div><span id="candidate-count" class="candidate-count">0 candidates</span></div>
+            <div class="budget-bar"><i id="budget-bar"></i><span id="budget-label">0%</span></div>
+            <div id="context-empty" class="context-empty">Context allocations appear here as evidence arrives.</div>
+            <div id="working-set" class="working-set"></div>
+            <div class="change-log"><p class="eyebrow">ALLOCATION LOG</p><div id="change-log"><span class="muted">No allocation decisions yet.</span></div></div>
+          </aside>
+        </div>
+        <section id="intervention" class="intervention-card hidden"><div class="intervention-icon">!</div><div><p class="eyebrow">SUPERVISOR RECOMMENDATION</p><h3 id="intervention-title">Trajectory needs intervention</h3><p id="intervention-copy"></p></div><div id="signal-chips" class="signal-chips"></div></section>
+      </section>
+    </main>
+
+    <main id="replay-view" class="view standalone-view">
+      <div class="page-intro"><p class="eyebrow">COUNTERFACTUAL EXPERIMENT</p><h1>What happened after the last useful step?</h1><p>Replay the identical deterministic trajectory with and without runtime enforcement. The model, task, and evidence remain fixed.</p><div class="replay-controls"><select id="replay-scenario"></select><button id="run-replay" class="primary-button"><span>↻</span> Run counterfactual</button></div></div>
+      <div id="replay-results" class="replay-results hidden">
+        <div class="savings-banner"><span>WASTE AVOIDED</span><strong id="saved-tokens">0 tokens</strong><p id="saved-copy"></p></div>
+        <div class="comparison-grid">
+          <article class="comparison-card supervised"><div class="comparison-kicker">SUPERVISED</div><h2>Circuit breaker enabled</h2><div class="big-number" id="supervised-calls">0</div><span>calls consumed</span><div class="comparison-stats" id="supervised-stats"></div><div id="supervised-chart" class="score-chart"></div></article>
+          <article class="comparison-card unrestrained"><div class="comparison-kicker">UNRESTRAINED</div><h2>Agent runs to completion</h2><div class="big-number" id="baseline-calls">0</div><span>calls consumed</span><div class="comparison-stats" id="baseline-stats"></div><div id="baseline-chart" class="score-chart"></div></article>
+        </div>
+      </div>
+    </main>
+
+    <main id="architecture-view" class="view standalone-view">
+      <div class="page-intro narrow"><p class="eyebrow">ONE CONTROL LOOP, TWO SYSTEMS</p><h1>Telemetry becomes a runtime decision.</h1><p>The prototype accepts OTel-style GenAI events. Every span updates both the trajectory supervisor and the bounded working set before control returns to the agent.</p></div>
+      <div class="architecture-flow"><article><span>01</span><b>Coding agent</b><p>Model turns, searches, reads, edits, and tests.</p></article><i>→</i><article><span>02</span><b>OTel event stream</b><p>Tokens, latency, fingerprints, files, tests, evidence.</p></article><i>→</i><article class="accent"><span>03</span><b>Runtime control</b><p>Score progress and reallocate working memory.</p></article><i>→</i><article><span>04</span><b>Act</b><p>Continue, steer, or open the circuit.</p></article></div>
+      <div class="architecture-details">
+        <article><p class="eyebrow">FLIGHT RECORDER</p><h2>Should the agent continue?</h2><ul><li>Semantic tool-result fingerprints</li><li>Tests, churn, novelty, and token burn</li><li>Hybrid deterministic + judge score</li><li>Explainable interventions</li></ul></article>
+        <article><p class="eyebrow">CONTEXT BUDGET</p><h2>What deserves the next token?</h2><ul><li>Cost/value admission</li><li>Symbol slices or whole files</li><li>Evidence-aware promotion</li><li>Contradiction-driven eviction</li></ul></article>
+        <article><p class="eyebrow">INTEGRATION</p><h2>Bring real telemetry.</h2><pre>POST /api/v1/events
+{
+  "runId": "trace-42",
+  "tool": "test",
+  "tokens": 384,
+  "evidence": ["17/18 pass"]
+}</pre></article>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
